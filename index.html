@@ -1,114 +1,457 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>PrepCoach — Adaptive Interview Simulator</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Company Report Builder — Interactive</title>
+
+  <!-- Tailwind via CDN for quick, modern styling -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- html2pdf for PDF export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.3/html2pdf.bundle.min.js"
+    integrity="sha512-YcsIPVnG6V1bzy3e6w0A2x3j1fDT1gT0P0h6g4i2k2m0v3R6m2u4V+e7Kk3Y1xG2k9k2VtGmC8y9Xb1r6rQ0w=="
+    crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; background: linear-gradient(135deg, #f9fafb, #e5e7eb); color: #111; }
-    .container { max-width: 1200px; margin: auto; padding: 20px; }
-    header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-    header h1 { font-size: 1.8rem; font-weight: bold; }
-    header small { color: #666; }
-    .btn { padding: 8px 14px; border: 1px solid #ccc; background: white; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
-    .btn.primary { background: #4f46e5; color: white; border: none; }
-    .grid { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; }
-    .card { background: white; border-radius: 10px; padding: 16px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
-    .chat-box { height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; margin-bottom: 12px; border-radius: 6px; background: #fdfdfd; }
-    .msg { margin: 6px 0; padding: 10px 14px; border-radius: 12px; max-width: 70%; font-size: 0.9rem; }
-    .msg.ai { background: #e0e7ff; text-align: left; }
-    .msg.user { background: #4f46e5; color: white; margin-left: auto; text-align: right; }
-    textarea { width: 100%; min-height: 60px; padding: 8px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9rem; }
-    .actions { display: flex; gap: 8px; margin-top: 8px; }
-    .stats { display: flex; gap: 10px; margin-top: 12px; }
-    .stat { flex: 1; background: #f9fafb; padding: 10px; border-radius: 6px; text-align: center; }
-    .stat h3 { font-size: 1rem; margin-bottom: 4px; }
-    .section h2 { font-size: 1rem; margin-bottom: 8px; }
-    .list { font-size: 0.85rem; line-height: 1.4; color: #444; margin-left: 16px; }
-    .quick-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-    .quick-btns .btn { font-size: 0.8rem; text-align: left; }
-    footer { text-align: center; font-size: 0.75rem; color: #666; margin-top: 20px; }
+    /* Small extra polish beyond Tailwind for print */
+    @media print {
+      body { -webkit-print-color-adjust: exact; }
+      .no-print { display: none !important; }
+      .report-card { box-shadow: none !important; margin: 0 !important; }
+    }
   </style>
 </head>
-<body>
-  <div class="container">
-    <header>
-      <div>
-        <h1>PrepCoach</h1>
-        <small>Adaptive Chat Interview Simulator</small>
-      </div>
-      <div>
-        <button class="btn">Export</button>
-        <button class="btn">Reset</button>
-      </div>
-    </header>
+<body class="bg-slate-50 text-slate-800 min-h-screen">
 
-    <div class="grid">
-      <!-- Left: Chat & Stats -->
-      <div>
-        <div class="card">
-          <div class="chat-box">
-            <div class="msg ai">Tell me about yourself.</div>
-            <div class="msg user">I’m a software engineer with 3 years of backend experience...</div>
-            <div class="msg ai">Good start. Add a measurable outcome. Next: What impact did you have?</div>
-          </div>
-          <textarea placeholder="Type your response..."></textarea>
-          <div class="actions">
-            <button class="btn primary">Send</button>
-            <button class="btn">New Q</button>
-          </div>
-        </div>
-
-        <div class="card">
-          <h2>Session Analytics</h2>
-          <div class="stats">
-            <div class="stat">
-              <h3>Score</h3>
-              <div>72/100</div>
-            </div>
-            <div class="stat">
-              <h3>Keyword</h3>
-              <div>65%</div>
-            </div>
-            <div class="stat">
-              <h3>Filler</h3>
-              <div>2</div>
-            </div>
-          </div>
+  <header class="no-print sticky top-0 bg-white/80 backdrop-blur border-b border-slate-200 z-10">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" class="text-indigo-600"><path d="M3 12h18" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 6h12M6 18h12" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div>
+          <h1 class="text-lg font-semibold">Company Report Builder</h1>
+          <p class="text-sm text-slate-500">Fill the sections, preview live, export PDF / HTML</p>
         </div>
       </div>
 
-      <!-- Right: Tips & Banks -->
-      <div class="card">
-        <h2>Quick Starters</h2>
-        <div class="quick-btns">
-          <button class="btn">Why do you want this role?</button>
-          <button class="btn">Describe a conflict you resolved.</button>
-          <button class="btn">What are your strengths?</button>
-          <button class="btn">What are your weaknesses?</button>
-        </div>
-
-        <h2 style="margin-top:16px;">Tips</h2>
-        <ul class="list">
-          <li>Use STAR: Situation → Task → Action → Result</li>
-          <li>Quote metrics and outcomes</li>
-          <li>End with what you learned</li>
-        </ul>
-
-        <h2 style="margin-top:16px;">Mini Rubric</h2>
-        <ul class="list">
-          <li>Structure: Problem → Actions → Impact</li>
-          <li>Specificity: Metrics & Examples</li>
-          <li>Depth: Trade-offs & Edge cases</li>
-          <li>Clarity: Avoid filler words</li>
-        </ul>
+      <div class="flex items-center gap-2">
+        <button id="saveBtn" class="px-3 py-1 rounded bg-amber-400 hover:bg-amber-500 text-white text-sm no-print">Save draft</button>
+        <button id="clearBtn" class="px-3 py-1 rounded border border-slate-200 bg-white text-sm no-print">Clear</button>
+        <div class="hidden sm:block border-l h-6 mx-2"></div>
+        <button id="exportPdf" class="px-3 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm no-print">Export PDF</button>
+        <button id="exportHtml" class="px-3 py-1 rounded border border-indigo-600 text-indigo-600 hover:bg-indigo-50 text-sm no-print">Download HTML</button>
       </div>
     </div>
+  </header>
 
-    <footer>
-      Built for focused practice. No accounts. Your data stays in your browser.
-    </footer>
-  </div>
+  <main class="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Form (left) -->
+    <section class="lg:col-span-1 bg-white rounded-xl shadow p-4">
+      <h2 class="font-semibold text-lg mb-2">Input — Company Details</h2>
+      <p class="text-sm text-slate-500 mb-4">Fill each section. The live preview is on the right.</p>
+
+      <form id="reportForm" class="space-y-4 overflow-auto max-h-[70vh] pr-2">
+        <!-- Introduction -->
+        <fieldset class="border border-slate-100 rounded p-3">
+          <legend class="text-sm font-medium">1. Introduction</legend>
+          <textarea name="intro" placeholder="Overview and purpose of the report" rows="3"
+            class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+        </fieldset>
+
+        <!-- Company profile -->
+        <fieldset class="border border-slate-100 rounded p-3">
+          <legend class="text-sm font-medium">2. Company Profile</legend>
+          <input name="name" placeholder="Company name" class="mt-2 block w-full rounded-md p-2 border-slate-200" />
+          <div class="grid grid-cols-2 gap-2 mt-2">
+            <input name="foundingYear" placeholder="Founding year" class="rounded-md p-2 border-slate-200" />
+            <input name="founder" placeholder="Founder(s)" class="rounded-md p-2 border-slate-200" />
+          </div>
+          <textarea name="vision" placeholder="Vision and mission" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+          <textarea name="coreValues" placeholder="Core values (comma separated)" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+        </fieldset>
+
+        <!-- Industry background -->
+        <fieldset class="border border-slate-100 rounded p-3">
+          <legend class="text-sm font-medium">3. Industry Background</legend>
+          <textarea name="marketOverview" placeholder="Market overview" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+          <textarea name="competitors" placeholder="Competitors" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+          <textarea name="industryPosition" placeholder="Company's position in the industry" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+        </fieldset>
+
+        <!-- Products -->
+        <fieldset class="border border-slate-100 rounded p-3">
+          <legend class="text-sm font-medium">4. Products & Services</legend>
+          <textarea name="productPortfolio" placeholder="Product portfolio" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+          <textarea name="services" placeholder="Services offered" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+          <textarea name="innovations" placeholder="Innovations" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+        </fieldset>
+
+        <!-- Org structure -->
+        <fieldset class="border border-slate-100 rounded p-3">
+          <legend class="text-sm font-medium">5. Organizational Structure</legend>
+          <textarea name="managementTeam" placeholder="Management team (names & roles)" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+          <textarea name="departments" placeholder="Departments / Divisions" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+          <input name="workforce" placeholder="Workforce strength (number)" class="mt-2 block w-full rounded-md p-2 border-slate-200" />
+        </fieldset>
+
+        <!-- Financial performance -->
+        <fieldset class="border border-slate-100 rounded p-3">
+          <legend class="text-sm font-medium">6. Financial Performance</legend>
+          <textarea name="revenueTrends" placeholder="Revenue & profit trends" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+          <textarea name="keyRatios" placeholder="Key financial ratios" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+          <textarea name="growth" placeholder="Growth over the years" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+        </fieldset>
+
+        <!-- Business strategy -->
+        <fieldset class="border border-slate-100 rounded p-3">
+          <legend class="text-sm font-medium">7. Business Strategy</legend>
+          <textarea name="marketing" placeholder="Marketing & sales strategy" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+          <textarea name="expansion" placeholder="Expansion plans" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+          <textarea name="customerEngagement" placeholder="Customer engagement" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+        </fieldset>
+
+        <!-- Achievements -->
+        <fieldset class="border border-slate-100 rounded p-3">
+          <legend class="text-sm font-medium">8. Achievements & Awards</legend>
+          <textarea name="milestones" placeholder="Milestones" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+          <textarea name="recognitions" placeholder="Recognitions / awards" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+        </fieldset>
+
+        <!-- CSR -->
+        <fieldset class="border border-slate-100 rounded p-3">
+          <legend class="text-sm font-medium">9. CSR & Sustainability</legend>
+          <textarea name="socialInitiatives" placeholder="Social initiatives" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+          <textarea name="sustainability" placeholder="Sustainability efforts" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+        </fieldset>
+
+        <!-- Challenges -->
+        <fieldset class="border border-slate-100 rounded p-3">
+          <legend class="text-sm font-medium">10. Challenges & Opportunities</legend>
+          <textarea name="currentChallenges" placeholder="Current challenges" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+          <textarea name="futureProspects" placeholder="Future prospects" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+        </fieldset>
+
+        <!-- Conclusion -->
+        <fieldset class="border border-slate-100 rounded p-3">
+          <legend class="text-sm font-medium">11. Conclusion</legend>
+          <textarea name="summary" placeholder="Summary of findings" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+          <textarea name="recommendations" placeholder="Suggestions / recommendations" rows="2" class="mt-2 block w-full rounded-md border-slate-200 p-2"></textarea>
+        </fieldset>
+
+        <div class="pt-2">
+          <small class="text-slate-400">Autosaves to your browser. Click <span class="font-medium text-slate-700">Save draft</span> to save now.</small>
+        </div>
+      </form>
+    </section>
+
+    <!-- Preview (middle & right) -->
+    <section class="lg:col-span-2">
+      <div id="reportPreview" class="report-card bg-white p-6 rounded-2xl shadow-lg">
+        <!-- Header of the report -->
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h2 id="previewName" class="text-2xl font-bold">[Company Name]</h2>
+            <p id="previewFounders" class="text-sm text-slate-500">Founders | Founded: —</p>
+          </div>
+          <div class="text-right text-sm text-slate-500">
+            <div id="previewDate">Report generated: —</div>
+            <div id="previewWorkforce">Workforce: —</div>
+          </div>
+        </div>
+
+        <hr class="my-4 border-slate-100" />
+
+        <div id="previewSections" class="space-y-5 text-slate-700 leading-relaxed">
+          <!-- Sections are populated dynamically -->
+        </div>
+
+        <footer class="mt-6 text-xs text-slate-400">
+          Generated with Company Report Builder • You can edit fields and export to PDF / HTML.
+        </footer>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    // App logic: form -> live preview, autosave, export
+    const form = document.getElementById('reportForm');
+    const preview = document.getElementById('previewSections');
+    const previewName = document.getElementById('previewName');
+    const previewFounders = document.getElementById('previewFounders');
+    const previewDate = document.getElementById('previewDate');
+    const previewWorkforce = document.getElementById('previewWorkforce');
+
+    const STORAGE_KEY = 'company_report_builder_v1';
+
+    // Default section order and titles according to user's outline
+    const sections = [
+      { key: 'intro', title: '1. Introduction' },
+      { key: 'name', title: 'Company' }, // handled special
+      { key: 'companyProfile', title: '2. Company Profile' }, // aggregated
+      { key: 'marketOverview', title: '3. Industry Background' },
+      { key: 'productPortfolio', title: '4. Products & Services' },
+      { key: 'managementTeam', title: '5. Organizational Structure' },
+      { key: 'revenueTrends', title: '6. Financial Performance' },
+      { key: 'marketing', title: '7. Business Strategy' },
+      { key: 'milestones', title: '8. Achievements & Awards' },
+      { key: 'socialInitiatives', title: '9. CSR & Sustainability' },
+      { key: 'currentChallenges', title: '10. Challenges & Opportunities' },
+      { key: 'summary', title: '11. Conclusion' },
+    ];
+
+    // Read saved state
+    function loadState() {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return {};
+      try {
+        return JSON.parse(raw);
+      } catch (e) {
+        console.warn('Failed parsing saved state', e);
+        return {};
+      }
+    }
+
+    // Save state
+    function saveState(state) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    }
+
+    // Populate form from state
+    function populateForm(state) {
+      for (const [k, v] of Object.entries(state)) {
+        const el = form.elements[k];
+        if (el) el.value = v;
+      }
+    }
+
+    // Gather form data into an object
+    function gather() {
+      const data = {};
+      const elements = Array.from(form.elements).filter(e => e.name);
+      elements.forEach(el => {
+        data[el.name] = el.value;
+      });
+      return data;
+    }
+
+    // Render preview
+    function renderPreview(data) {
+      previewName.textContent = data.name?.trim() || '[Company Name]';
+      let founders = (data.founder || '').trim();
+      const year = data.foundingYear?.trim();
+      previewFounders.textContent = (founders || 'Founder(s) —') + (year ? ' | Founded: ' + year : '');
+      previewDate.textContent = 'Report generated: ' + new Date().toLocaleString();
+      previewWorkforce.textContent = 'Workforce: ' + (data.workforce || '—');
+
+      const container = preview;
+      container.innerHTML = ''; // clear
+
+      // Helper to append a section only if content present
+      function appendSection(title, content) {
+        const sec = document.createElement('section');
+        sec.className = 'rounded p-3 bg-slate-50 border border-slate-100';
+        const h = document.createElement('h3');
+        h.className = 'font-semibold';
+        h.textContent = title;
+        sec.appendChild(h);
+        const p = document.createElement('div');
+        p.className = 'mt-2 whitespace-pre-wrap text-sm text-slate-700';
+        p.innerText = content || '—';
+        sec.appendChild(p);
+        container.appendChild(sec);
+      }
+
+      // 1 Introduction
+      appendSection('1. Introduction', data.intro);
+
+      // 2 Company Profile (aggregate)
+      const cp = [
+        data.vision ? 'Vision / Mission: ' + data.vision : '',
+        data.coreValues ? 'Core values: ' + data.coreValues : ''
+      ].filter(Boolean).join('\n\n');
+      appendSection('2. Company Profile', cp);
+
+      // 3 Industry Background
+      const ib = [
+        data.marketOverview ? 'Market overview: ' + data.marketOverview : '',
+        data.competitors ? 'Competitors: ' + data.competitors : '',
+        data.industryPosition ? 'Position in industry: ' + data.industryPosition : ''
+      ].filter(Boolean).join('\n\n');
+      appendSection('3. Industry Background', ib);
+
+      // 4 Products & Services
+      const ps = [
+        data.productPortfolio ? 'Product portfolio: ' + data.productPortfolio : '',
+        data.services ? 'Services: ' + data.services : '',
+        data.innovations ? 'Innovations: ' + data.innovations : ''
+      ].filter(Boolean).join('\n\n');
+      appendSection('4. Products & Services', ps);
+
+      // 5 Org structure
+      const os = [
+        data.managementTeam ? 'Management team: ' + data.managementTeam : '',
+        data.departments ? 'Departments: ' + data.departments : '',
+        data.workforce ? 'Workforce: ' + data.workforce : ''
+      ].filter(Boolean).join('\n\n');
+      appendSection('5. Organizational Structure', os);
+
+      // 6 Financial performance
+      const fp = [
+        data.revenueTrends ? 'Revenue & Profit Trends: ' + data.revenueTrends : '',
+        data.keyRatios ? 'Key financial ratios: ' + data.keyRatios : '',
+        data.growth ? 'Growth over the years: ' + data.growth : ''
+      ].filter(Boolean).join('\n\n');
+      appendSection('6. Financial Performance', fp);
+
+      // 7 Business strategy
+      const bs = [
+        data.marketing ? 'Marketing & Sales Strategy: ' + data.marketing : '',
+        data.expansion ? 'Expansion Plans: ' + data.expansion : '',
+        data.customerEngagement ? 'Customer engagement: ' + data.customerEngagement : ''
+      ].filter(Boolean).join('\n\n');
+      appendSection('7. Business Strategy', bs);
+
+      // 8 Achievements and awards
+      const aa = [
+        data.milestones ? 'Milestones: ' + data.milestones : '',
+        data.recognitions ? 'Recognitions / awards: ' + data.recognitions : ''
+      ].filter(Boolean).join('\n\n');
+      appendSection('8. Achievements & Awards', aa);
+
+      // 9 CSR
+      const csr = [
+        data.socialInitiatives ? 'Social initiatives: ' + data.socialInitiatives : '',
+        data.sustainability ? 'Sustainability efforts: ' + data.sustainability : ''
+      ].filter(Boolean).join('\n\n');
+      appendSection('9. CSR & Sustainability', csr);
+
+      // 10 Challenges & opportunities
+      const co = [
+        data.currentChallenges ? 'Current challenges: ' + data.currentChallenges : '',
+        data.futureProspects ? 'Future prospects: ' + data.futureProspects : ''
+      ].filter(Boolean).join('\n\n');
+      appendSection('10. Challenges & Opportunities', co);
+
+      // 11 Conclusion
+      const concl = [
+        data.summary ? 'Summary of findings: ' + data.summary : '',
+        data.recommendations ? 'Suggestions / Recommendations: ' + data.recommendations : ''
+      ].filter(Boolean).join('\n\n');
+      appendSection('11. Conclusion', concl);
+    }
+
+    // Update preview on input
+    function onInputChange() {
+      const data = gather();
+      renderPreview(data);
+      saveState(data);
+    }
+
+    // Load initial
+    const initialState = loadState();
+    populateForm(initialState);
+    renderPreview(gather());
+
+    // Attach events
+    form.addEventListener('input', () => {
+      // Debounce small
+      if (window._updateTimeout) clearTimeout(window._updateTimeout);
+      window._updateTimeout = setTimeout(onInputChange, 200);
+    });
+
+    // Buttons
+    document.getElementById('saveBtn').addEventListener('click', () => {
+      const data = gather();
+      saveState(data);
+      // tiny visual feedback
+      const btn = document.getElementById('saveBtn');
+      btn.textContent = 'Saved ✓';
+      setTimeout(()=> btn.textContent = 'Save draft', 1200);
+    });
+
+    document.getElementById('clearBtn').addEventListener('click', () => {
+      if (!confirm('Clear the form and preview? This will remove local draft.')) return;
+      localStorage.removeItem(STORAGE_KEY);
+      form.reset();
+      renderPreview(gather());
+    });
+
+    // Export PDF
+    document.getElementById('exportPdf').addEventListener('click', () => {
+      const element = document.querySelector('.report-card');
+      // Options for html2pdf
+      const opt = {
+        margin:       10,
+        filename:     (form.elements.name.value || 'company_report') + '.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2, useCORS: true, logging: false },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      // Generate PDF
+      html2pdf().set(opt).from(element).save();
+    });
+
+    // Download HTML snapshot
+    document.getElementById('exportHtml').addEventListener('click', () => {
+      const data = gather();
+      // Build minimal HTML
+      const title = data.name || 'Company Report';
+      const html = `
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>${escapeHtml(title)}</title>
+<style>
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,"Helvetica Neue",Arial;padding:24px;color:#0f172a}
+  h1{font-size:20px}
+  h2{margin-top:18px}
+  pre{white-space:pre-wrap}
+  .section{padding:12px;border:1px solid #e6eef8;border-radius:8px;background:#fbfdff;margin-bottom:12px}
+</style>
+</head>
+<body>
+  <h1>${escapeHtml(title)}</h1>
+  <p><em>Generated: ${new Date().toLocaleString()}</em></p>
+  <hr/>
+  ${Object.entries(data).map(([k,v]) => `
+    <div class="section"><strong>${escapeHtml(k)}</strong><pre>${escapeHtml(v||'')}</pre></div>
+  `).join('')}
+</body>
+</html>`;
+      const blob = new Blob([html], {type:'text/html'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = (data.name || 'company_report') + '.html';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    });
+
+    // Minimal HTML escaping for the download builder
+    function escapeHtml(s) {
+      return String(s || '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+    }
+
+    // Initial small autosave heartbeat (in case user closes)
+    window.addEventListener('beforeunload', () => {
+      saveState(gather());
+    });
+
+    // Accessibility: allow keyboard export with ALT+P -> PDF, ALT+H -> HTML
+    window.addEventListener('keydown', (e) => {
+      if (e.altKey && e.key.toLowerCase() === 'p') {
+        e.preventDefault(); document.getElementById('exportPdf').click();
+      }
+      if (e.altKey && e.key.toLowerCase() === 'h') {
+        e.preventDefault(); document.getElementById('exportHtml').click();
+      }
+    });
+
+  </script>
+
 </body>
 </html>

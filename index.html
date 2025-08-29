@@ -1,0 +1,399 @@
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Save, Send, Sparkles, Bot, User, Download, Timer, Settings, RefreshCcw, History, Trash2, ChevronDown, Plus, Star, CheckCircle2 } from "lucide-react";
+
+const personas = [
+  { id: "hr", name: "HR Pro", tag: "Behavioral", tone: "warm", color: "from-rose-500 to-pink-500", difficulty: 0.4, seed: ["Tell me about yourself.", "Why do you want this role?", "Describe a conflict you resolved."] , keywords: { generic: ["team", "impact", "challenge", "result", "learned", "growth", "stakeholder"] } },
+  { id: "dsa", name: "Algo Master", tag: "DSA", tone: "direct", color: "from-indigo-500 to-blue-500", difficulty: 0.7, seed: ["Given an array of integers, return indices of two numbers that add up to a target.", "Design a stack with getMin in O(1).", "Explain quicksort and its complexity."] , keywords: { arrays: ["time complexity", "space", "hashmap", "two pointers", "edge cases"], generic: ["optimize", "trade-off", "big o"] } },
+  { id: "sd", name: "Architect", tag: "System Design", tone: "probing", color: "from-emerald-500 to-teal-500", difficulty: 0.8, seed: ["Design a URL shortener.", "Design a real-time chat system.", "How would you design a ride-sharing matcher?"], keywords: { generic: ["scalability", "consistency", "availability", "throughput", "latency", "caching", "partition", "replication", "sharding", "load balancer", "queue", "database", "index"] } },
+  { id: "py", name: "Py Mentor", tag: "Python", tone: "practical", color: "from-amber-500 to-orange-500", difficulty: 0.5, seed: ["Explain list vs tuple.", "What are decorators and when to use them?", "Difference between threading and multiprocessing in Python."] , keywords: { generic: ["PEP8", "iterators", "generators", "comprehensions", "GIL", "virtualenv", "pytest"] } },
+  { id: "sql", name: "Data Sage", tag: "SQL/DB", tone: "precise", color: "from-purple-500 to-fuchsia-500", difficulty: 0.6, seed: ["Write a query to find the 2nd highest salary.", "Explain normalization vs denormalization.", "What is an index and how does it work?"], keywords: { generic: ["JOIN", "GROUP BY", "HAVING", "INDEX", "EXPLAIN", "ACID", "transaction"] } }
+];
+
+const banks = {
+  hr: [
+    "Tell me about a time you failed and what you learned.",
+    "How do you prioritize when everything is urgent?",
+    "What does success in this role look like to you?",
+    "Describe a time you influenced without authority."
+  ],
+  dsa: [
+    "Implement an LRU cache and analyze complexity.",
+    "Find median of two sorted arrays.",
+    "Detect a cycle in a linked list and return the node where it begins.",
+    "Explain differences between BFS and DFS with use-cases."
+  ],
+  sd: [
+    "Design a news feed like Instagram.",
+    "Design rate limiting for an API gateway.",
+    "Design a scalable notification system.",
+    "Design distributed counters with strong accuracy."
+  ],
+  py: [
+    "How do context managers work internally?",
+    "Explain async/await and an example use.",
+    "What is the difference between deepcopy and copy?",
+    "Optimize a slow pandas pipeline for memory."
+  ],
+  sql: [
+    "Find customers with orders in every month of 2024.",
+    "Explain indexes: B-Tree vs Hash and trade-offs.",
+    "Window functions: rank top 3 per category.",
+    "Deadlocks: how to detect and mitigate?"
+  ]
+};
+
+const fillerWords = ["um", "uh", "like", "you know", "basically", "actually", "literally", "kinda", "sort of"];
+
+function sample(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function clamp(n, a, b) { return Math.max(a, Math.min(n, b)); }
+function tokenize(t) { return (t||"").toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean); }
+
+function scoreAnswer(text, persona) {
+  const tokens = tokenize(text);
+  const lengthScore = clamp(tokens.length / 120, 0, 1);
+  const filler = fillerWords.reduce((c, f) => c + (text.toLowerCase().split(f).length - 1), 0);
+  const keywordSets = Object.values(persona.keywords || {});
+  const uniqueKeywords = [...new Set(keywordSets.flat().map(k => k.toLowerCase()))];
+  const hit = uniqueKeywords.filter(k => tokens.includes(k)).length;
+  const coverage = uniqueKeywords.length ? hit / uniqueKeywords.length : 0.3;
+  const structure = /(first|then|finally|impact|result|complexity|trade\-off|assumption)/i.test(text) ? 1 : 0.3;
+  const base = 0.35 * lengthScore + 0.4 * coverage + 0.25 * structure;
+  const penalty = clamp(filler * 0.02, 0, 0.4);
+  const difficulty = persona.difficulty;
+  const final = clamp(base - penalty - (difficulty - 0.5) * 0.15, 0, 1);
+  return { score: Math.round(final * 100), filler, coverage: Math.round(coverage * 100) };
+}
+
+function generateProbe(userText, persona) {
+  const probes = {
+    hr: ["What was the measurable outcome?", "What would you do differently next time?", "How did you bring stakeholders onboard?"],
+    dsa: ["State time and space complexity.", "Can you optimize further?", "What are edge cases and tests?"],
+    sd: ["Estimate QPS and storage.", "Where are the bottlenecks?", "How do you handle failures and retries?"],
+    py: ["Show a minimal code example.", "When would you not use this?", "How do you test this?"],
+    sql: ["Show the query.", "How will the index change the plan?", "What is the isolation level here?"]
+  };
+  const p = probes[persona.id] || probes.hr;
+  const tokens = tokenize(userText);
+  if (tokens.length < 40) return sample(p);
+  if (!/(example|code|query|diagram|estimate|complexity|result)/i.test(userText)) return "Give a concrete example with specifics.";
+  return sample(p);
+}
+
+function aiReply(userText, persona) {
+  const s = scoreAnswer(userText, persona);
+  const probe = generateProbe(userText, persona);
+  const encouragement = s.score > 75 ? "Strong answer. Consider a concise summary." : s.score > 55 ? "Good direction. Add trade-offs and metrics." : "You have a start. Structure with Problem → Actions → Impact and add specifics.";
+  return { text: `${encouragement}\nNext: ${probe}`, meta: s };
+}
+
+function Chip({ text }) {
+  return <span className="px-2 py-1 rounded-full text-xs bg-muted/50">{text}</span>;
+}
+
+function PersonaBadge({ p, active }) {
+  return (
+    <div className={`flex items-center gap-2 px-3 py-2 rounded-2xl border transition ${active ? "border-primary" : "border-transparent"}`}>
+      <div className={`h-6 w-6 rounded-full bg-gradient-to-r ${p.color}`} />
+      <div className="flex flex-col leading-tight">
+        <span className="text-sm font-semibold">{p.name}</span>
+        <span className="text-[10px] opacity-70">{p.tag}</span>
+      </div>
+    </div>
+  );
+}
+
+function Stat({ icon: Icon, label, value, suffix }) {
+  return (
+    <Card className="shadow-sm">
+      <CardContent className="p-4 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-muted"><Icon className="h-5 w-5" /></div>
+          <div>
+            <div className="text-xs opacity-70">{label}</div>
+            <div className="text-xl font-bold">{value}{suffix}</div>
+          </div>
+        </div>
+        <CheckCircle2 className="h-5 w-5 opacity-60" />
+      </CardContent>
+    </Card>
+  );
+}
+
+function useLocalStore(key, initial) {
+  const [state, setState] = useState(() => {
+    const raw = typeof window !== "undefined" ? window.localStorage.getItem(key) : null;
+    return raw ? JSON.parse(raw) : initial;
+  });
+  useEffect(() => { if (typeof window !== "undefined") window.localStorage.setItem(key, JSON.stringify(state)); }, [key, state]);
+  return [state, setState];
+}
+
+export default function PrepCoach() {
+  const [personaId, setPersonaId] = useLocalStore("pc.persona", personas[0].id);
+  const persona = useMemo(() => personas.find(p => p.id === personaId) || personas[0], [personaId]);
+  const [difficulty, setDifficulty] = useLocalStore("pc.difficulty", 5);
+  const [topic, setTopic] = useLocalStore("pc.topic", "general");
+  const [message, setMessage] = useState("");
+  const [messages, setMessages] = useLocalStore("pc.messages", []);
+  const [sessionScore, setSessionScore] = useLocalStore("pc.sessionScore", []);
+  const [timerOn, setTimerOn] = useLocalStore("pc.timerOn", false);
+  const [seconds, setSeconds] = useLocalStore("pc.seconds", 0);
+  const listRef = useRef(null);
+
+  useEffect(() => { const i = setInterval(() => { if (timerOn) setSeconds(s => s + 1); }, 1000); return () => clearInterval(i); }, [timerOn]);
+  useEffect(() => { if (listRef.current) listRef.current.scrollTop = listRef.current.scrollHeight; }, [messages]);
+
+  useEffect(() => {
+    if (messages.length === 0) {
+      const seed = sample(persona.seed);
+      setMessages([{ role: "ai", text: seed, meta: null, ts: Date.now() }]);
+    }
+  }, []);
+
+  function askNext() {
+    if (!message.trim()) return;
+    const userMsg = { role: "user", text: message.trim(), meta: null, ts: Date.now() };
+    const reply = aiReply(userMsg.text, persona);
+    const aiMsg = { role: "ai", text: reply.text, meta: reply.meta, ts: Date.now() };
+    setMessages(m => [...m, userMsg, aiMsg]);
+    setSessionScore(s => [...s, reply.meta]);
+    setMessage("");
+  }
+
+  function newQuestion() {
+    const pool = banks[persona.id] || persona.seed;
+    const q = sample(pool);
+    setMessages(m => [...m, { role: "ai", text: q, meta: null, ts: Date.now() }]);
+  }
+
+  function resetSession() {
+    setMessages([]);
+    setSessionScore([]);
+    setSeconds(0);
+    setTimerOn(false);
+  }
+
+  function exportTranscript() {
+    const blob = new Blob([JSON.stringify({ persona: persona.name, topic, difficulty, seconds, messages }, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `prepcoach_${new Date().toISOString().slice(0,10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  const avg = useMemo(() => {
+    if (!sessionScore.length) return { score: 0, coverage: 0, filler: 0 };
+    const s = sessionScore.reduce((a, b) => ({ score: a.score + b.score, coverage: a.coverage + b.coverage, filler: a.filler + b.filler }), { score: 0, coverage: 0, filler: 0 });
+    return { score: Math.round(s.score / sessionScore.length), coverage: Math.round(s.coverage / sessionScore.length), filler: s.filler };
+  }, [sessionScore]);
+
+  return (
+    <div className="min-h-screen w-full bg-gradient-to-br from-background to-muted/30">
+      <div className="mx-auto max-w-7xl p-4 md:p-8">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className={`h-10 w-10 rounded-2xl bg-gradient-to-r ${persona.color}`} />
+            <div>
+              <div className="text-2xl font-black tracking-tight">PrepCoach</div>
+              <div className="text-xs opacity-70">Adaptive Chat Interview Simulator</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={exportTranscript}><Download className="h-4 w-4 mr-2"/>Export</Button>
+            <Button variant="outline" onClick={resetSession}><RefreshCcw className="h-4 w-4 mr-2"/>Reset</Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          <div className="lg:col-span-3 flex flex-col gap-4">
+            <Card className="overflow-hidden">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <PersonaBadge p={persona} active />
+                  <Badge variant="secondary">{persona.tone}</Badge>
+                  <Badge>{persona.tag}</Badge>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2 text-sm opacity-80"><Timer className="h-4 w-4"/>{Math.floor(seconds/60).toString().padStart(2,"0")}:{(seconds%60).toString().padStart(2,"0")}</div>
+                  <Button variant={timerOn?"destructive":"default"} onClick={()=>setTimerOn(v=>!v)}>{timerOn?"Stop":"Start"}</Button>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div ref={listRef} className="h-[52vh] overflow-y-auto p-4 space-y-3">
+                  <AnimatePresence initial={false}>
+                    {messages.map((m, i) => (
+                      <motion.div key={i} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -6 }} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
+                        <div className={`max-w-[80%] rounded-2xl p-3 text-sm shadow-sm ${m.role === "user" ? "bg-primary text-primary-foreground" : "bg-muted"}`}>
+                          <div className="flex items-center gap-2 mb-1">
+                            {m.role === "user" ? <User className="h-3.5 w-3.5"/> : <Bot className="h-3.5 w-3.5"/>}
+                            <span className="text-[10px] opacity-70">{new Date(m.ts).toLocaleTimeString()}</span>
+                          </div>
+                          <div className="whitespace-pre-wrap leading-relaxed">{m.text}</div>
+                          {m.meta && (
+                            <div className="mt-2 flex items-center gap-2 flex-wrap">
+                              <Chip text={`Score ${m.meta.score}/100`} />
+                              <Chip text={`Coverage ${m.meta.coverage}%`} />
+                              <Chip text={`Filler ${m.meta.filler}`} />
+                            </div>
+                          )}
+                        </div>
+                      </motion.div>
+                    ))}
+                  </AnimatePresence>
+                </div>
+                <div className="p-3 border-t">
+                  <div className="flex items-end gap-2">
+                    <Textarea value={message} onChange={e=>setMessage(e.target.value)} placeholder="Type your response..." className="min-h-[60px]"/>
+                    <div className="flex flex-col gap-2">
+                      <Button onClick={askNext}><Send className="h-4 w-4 mr-1"/>Send</Button>
+                      <Button variant="secondary" onClick={newQuestion}><Plus className="h-4 w-4 mr-1"/>New Q</Button>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Session Analytics</CardTitle>
+              </CardHeader>
+              <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Stat icon={Star} label="Average Score" value={avg.score} suffix="/100"/>
+                <Stat icon={Sparkles} label="Keyword Coverage" value={avg.coverage} suffix="%"/>
+                <Stat icon={History} label="Filler Words" value={avg.filler} suffix=""/>
+                <div className="col-span-full">
+                  <div className="text-xs mb-2 opacity-70">Target Difficulty</div>
+                  <div className="flex items-center gap-3">
+                    <Slider value={[difficulty]} min={1} max={10} step={1} onValueChange={v=>setDifficulty(v[0])} className="w-full"/>
+                    <Badge variant="outline">{difficulty}</Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="lg:col-span-1 flex flex-col gap-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Mode & Topic</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between"><div className="flex items-center gap-2"><Avatar className="h-6 w-6"><AvatarFallback>{persona.name.slice(0,2)}</AvatarFallback></Avatar><span>{persona.name}</span></div><ChevronDown className="h-4 w-4"/></Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-64">
+                    {personas.map(p => (
+                      <DropdownMenuItem key={p.id} onClick={()=>setPersonaId(p.id)}>
+                        <div className="flex items-center gap-2">
+                          <div className={`h-5 w-5 rounded-full bg-gradient-to-r ${p.color}`} />
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium">{p.name}</span>
+                            <span className="text-[10px] opacity-70">{p.tag} • {p.tone}</span>
+                          </div>
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Tabs value={topic} onValueChange={setTopic} className="w-full">
+                  <TabsList className="grid grid-cols-3">
+                    <TabsTrigger value="general">General</TabsTrigger>
+                    <TabsTrigger value="coding">Coding</TabsTrigger>
+                    <TabsTrigger value="design">Design</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="general" className="mt-3">
+                    <div className="space-y-2 text-xs">
+                      <div className="font-semibold">Tips</div>
+                      <ul className="list-disc pl-4 space-y-1 opacity-80">
+                        <li>Use STAR: Situation → Task → Action → Result</li>
+                        <li>Quote metrics and outcomes</li>
+                        <li>End with what you learned</li>
+                      </ul>
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="coding" className="mt-3">
+                    <div className="space-y-2 text-xs">
+                      <div className="font-semibold">Tips</div>
+                      <ul className="list-disc pl-4 space-y-1 opacity-80">
+                        <li>State complexity before coding</li>
+                        <li>Cover edge cases and tests</li>
+                        <li>Discuss alternative approaches</li>
+                      </ul>
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="design" className="mt-3">
+                    <div className="space-y-2 text-xs">
+                      <div className="font-semibold">Tips</div>
+                      <ul className="list-disc pl-4 space-y-1 opacity-80">
+                        <li>Clarify requirements and constraints</li>
+                        <li>Back-of-the-envelope estimates</li>
+                        <li>Call out trade-offs and failure modes</li>
+                      </ul>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+
+                <div className="space-y-2">
+                  <div className="text-xs opacity-70">Quick Starters</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    {persona.seed.slice(0,4).map((q,i)=> (
+                      <Button key={i} variant="secondary" onClick={()=>setMessages(m=>[...m, { role: "ai", text: q, meta: null, ts: Date.now() }])} className="justify-start h-auto text-left whitespace-normal">{q}</Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-xs opacity-70">Practice Bank</div>
+                  <div className="grid grid-cols-1 gap-2">
+                    {(banks[persona.id]||[]).slice(0,6).map((q,i)=> (
+                      <Button key={i} variant="outline" onClick={()=>setMessages(m=>[...m, { role: "ai", text: q, meta: null, ts: Date.now() }])} className="justify-start h-auto text-left whitespace-normal">{q}</Button>
+                    ))}
+                  </div>
+                </div>
+
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Mini Rubric</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3 text-xs">
+                <div className="flex items-center justify-between"><span>Structure</span><Badge variant="outline">Problem → Actions → Impact</Badge></div>
+                <div className="flex items-center justify-between"><span>Specificity</span><Badge variant="outline">Metrics & Examples</Badge></div>
+                <div className="flex items-center justify-between"><span>Depth</span><Badge variant="outline">Trade-offs & Edge cases</Badge></div>
+                <div className="flex items-center justify-between"><span>Clarity</span><Badge variant="outline">Avoid filler words</Badge></div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Utilities</CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-col gap-2">
+                <Button variant="secondary" onClick={newQuestion}><Sparkles className="h-4 w-4 mr-2"/>Challenge Me</Button>
+                <Button variant="outline" onClick={resetSession}><Trash2 className="h-4 w-4 mr-2"/>Clear Session</Button>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        <div className="text-center text-xs opacity-60 mt-6">Built for focused practice. No accounts. Your data stays in your browser.</div>
+      </div>
+    </div>
+  );
+}
